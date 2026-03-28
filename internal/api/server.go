@@ -302,7 +302,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		s.registerManagementRoutes()
 	}
 
-	// === CLIProxyAPIPlus 扩展: 注册 Kiro OAuth Web 路由 ===
+	// === CLIProxyAPIPlus 鎵╁睍: 娉ㄥ唽 Kiro OAuth Web 璺敱 ===
 	kiroOAuthHandler := kiro.NewOAuthWebHandler(cfg)
 	kiroOAuthHandler.RegisterRoutes(engine)
 	log.Info("Kiro OAuth Web routes registered at /v0/oauth/kiro/*")
@@ -342,6 +342,20 @@ func (s *Server) setupRoutes() {
 		v1.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
 		v1.POST("/responses", openaiResponsesHandlers.Responses)
 		v1.POST("/responses/compact", openaiResponsesHandlers.Compact)
+	}
+
+	// Some third-party Codex/OpenAI-compatible clients ignore a `/v1` base path
+	// and request root-level endpoints like `/responses` directly. Provide
+	// root aliases so those clients can still interoperate with this service.
+	rootCompat := s.engine.Group("/")
+	rootCompat.Use(AuthMiddleware(s.accessManager))
+	{
+		rootCompat.GET("/models", s.unifiedModelsHandler(openaiHandlers, claudeCodeHandlers))
+		rootCompat.POST("/chat/completions", openaiHandlers.ChatCompletions)
+		rootCompat.POST("/completions", openaiHandlers.Completions)
+		rootCompat.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
+		rootCompat.POST("/responses", openaiResponsesHandlers.Responses)
+		rootCompat.POST("/responses/compact", openaiResponsesHandlers.Compact)
 	}
 
 	// Gemini compatible API routes
